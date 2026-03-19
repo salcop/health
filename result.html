@@ -16,40 +16,38 @@
         .btn-link { display: inline-block; padding: 6px 12px; background: #ff9900; color: #fff; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold; }
         .action-area { display: flex; gap: 10px; margin-top: 20px; display: none; }
         .btn-action { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-kakao { background: #fee500; color: #3c1e1e; text-decoration: none; }
+        .btn-kakao { background: #fee500; color: #3c1e1e; }
         .btn-home { background: #333; color: #fff; }
-        .disclaimer { font-size: 11px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>영양소 데이터 매칭 리포트</h2>
-        <div id="loading">🚀 AI가 데이터를 분석 중입니다...</div>
+        <div id="loading">🚀 AI가 데이터를 정밀 분석 중입니다...</div>
         
         <div id="content">
             <p id="user-info" style="font-size: 14px; color: #666; text-align: center; margin-bottom: 20px;"></p>
             <table id="result-table-ui">
-                <thead>
-                    <tr><th>성분</th><th>기능 요약</th><th>주의사항</th><th>조회</th></tr>
-                </thead>
+                <thead><tr><th>성분</th><th>기능 요약</th><th>주의사항</th><th>조회</th></tr></thead>
                 <tbody id="result-table-body"></tbody>
             </table>
             <div class="action-area" id="action-area-ui">
-                <button class="btn-action btn-kakao" onclick="alert('준비 중!')">카톡 공유</button>
-                <button class="btn-action btn-home" onclick="alert('홈 화면 추가!')">앱 저장</button>
+                <button class="btn-action btn-kakao" onclick="alert('카톡 공유 준비 중!')">카톡 공유</button>
+                <button class="btn-action btn-home" onclick="alert('홈 화면에 추가해 보세요!')">앱 저장</button>
             </div>
         </div>
-        <div class="disclaimer">본 정보는 의학적 진단을 대신할 수 없으며, 참고용 자료입니다.</div>
     </div>
 
     <script>
         const API_KEY = "AIzaSyCktRjrGnIdA3iO4BE5bONjy_f_Dmg0a50"; 
 
         async function getAIResponse(query) {
-            // 경로를 v1beta로 되돌려 호환성 확보
+            // 가장 안정적인 v1beta 경로와 모델명 사용
             const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
             
-            const prompt = `Task: Provide 3 health supplements for "${query}". Respond ONLY with a JSON array in this format: [{"name":"Ingredient Name","effect":"Short benefit","caution":"One warning"}]. Use Korean for values.`;
+            const prompt = `Task: Recommendation for "${query}". Output ONLY a raw JSON array. 
+            Format: [{"name":"성분명","effect":"기능","caution":"주의"}] 
+            Respond only with the array, no markdown.`;
             
             try {
                 const response = await fetch(API_URL, {
@@ -57,27 +55,28 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            // 에러가 났던 response_mime_type 항목을 삭제하여 호환성 문제 해결
-                            temperature: 0.5
-                        }
+                        generationConfig: { temperature: 0.1 }
                     })
                 });
                 
                 const data = await response.json();
-                
                 if (data.error) throw new Error(data.error.message);
 
                 let text = data.candidates[0].content.parts[0].text;
-                // JSON만 추출하는 안전 장치
-                const jsonStart = text.indexOf('[');
-                const jsonEnd = text.lastIndexOf(']') + 1;
-                const cleanJson = text.substring(jsonStart, jsonEnd);
                 
+                // [정밀 추출 로직] 텍스트 중 JSON 배열 시작과 끝을 찾아 수동 파싱
+                const startIdx = text.indexOf('[');
+                const endIdx = text.lastIndexOf(']') + 1;
+                
+                if (startIdx === -1 || endIdx === 0) {
+                    throw new Error("AI가 데이터 형식을 맞추지 못했습니다.");
+                }
+                
+                const cleanJson = text.substring(startIdx, endIdx);
                 return JSON.parse(cleanJson);
             } catch (e) {
-                console.error("Error Detail:", e);
-                document.getElementById('loading').innerHTML = "❌ 분석 에러 발생:<br>" + e.message;
+                console.error("Debug:", e);
+                document.getElementById('loading').innerHTML = "❌ 분석 지연 발생: 다시 검색해 주세요.<br>(" + e.message + ")";
                 return null;
             }
         }
