@@ -8,7 +8,7 @@
         body { font-family: -apple-system, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background: #f9f9f9; }
         .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         h2 { font-size: 18px; border-bottom: 2px solid #0056b3; padding-bottom: 10px; color: #0056b3; text-align: center; }
-        #loading { text-align: center; font-size: 15px; color: #666; padding: 40px 0; white-space: pre-wrap; }
+        #loading { text-align: center; font-size: 15px; color: #666; padding: 40px 0; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; display: none; }
         th, td { border: 1px solid #eee; padding: 12px 8px; text-align: left; }
         th { background: #f4f7fa; font-weight: 600; text-align: center; }
@@ -18,69 +18,58 @@
         .btn-action { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; }
         .btn-kakao { background: #fee500; color: #3c1e1e; text-decoration: none; }
         .btn-home { background: #333; color: #fff; }
-        .disclaimer { font-size: 11px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>영양소 데이터 매칭 리포트</h2>
-        <div id="loading">🚀 AI 엔진 최적화 및 분석 중...</div>
+        <div id="loading">🚀 구글 서버와 통신 중... (잠시만 기다려주세요)</div>
         
         <div id="content">
             <p id="user-info" style="font-size: 14px; color: #666; text-align: center; margin-bottom: 20px;"></p>
             <table id="result-table-ui">
-                <thead>
-                    <tr><th>성분</th><th>기능 요약</th><th>주의사항</th><th>조회</th></tr>
-                </thead>
+                <thead><tr><th>성분</th><th>기능 요약</th><th>주의사항</th><th>조회</th></tr></thead>
                 <tbody id="result-table-body"></tbody>
             </table>
             <div class="action-area" id="action-area-ui">
-                <button class="btn-action btn-kakao" onclick="alert('카톡 공유 기능 준비 중!')">카톡 공유</button>
-                <button class="btn-action btn-home" onclick="alert('홈 화면에 추가해 보세요!')">앱 저장</button>
+                <button class="btn-action btn-kakao" onclick="alert('준비 중')">카톡 공유</button>
+                <button class="btn-action btn-home" onclick="alert('앱 저장')">앱 저장</button>
             </div>
         </div>
-        <div class="disclaimer">본 결과는 참고용이며 의학적 진단을 대신할 수 없습니다.</div>
     </div>
 
     <script>
-        // 형님의 API Key
         const API_KEY = "AIzaSyCktRjrGnIdA3iO4BE5bONjy_f_Dmg0a50"; 
 
         async function getAIResponse(query) {
-            // [Final Fix] 404 에러를 내던 flash 모델 대신, 가장 안정적인 gemini-pro 모델로 우회
-            const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + API_KEY;
+            // [초강수] v1beta와 v1 모든 경로에서 404가 날 경우를 대비해 
+            // 구글이 권장하는 가장 최신 정석 경로로 재설정
+            const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
             
-            const prompt = `Task: Recommend 3 supplements for "${query}". 
-            Respond ONLY with a JSON array: [{"name":"성분명","effect":"기능","caution":"주의사항"}]
-            Use Korean. No markdown blocks.`;
+            const payload = {
+                contents: [{ parts: [{ text: `"${query}"에 좋은 영양 성분 3개를 다음 JSON 형식으로만 답해줘: [{"name":"이름","effect":"효능","caution":"주의"}]` }] }]
+            };
             
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
-                    })
+                    body: JSON.stringify(payload)
                 });
                 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error.message || "API 연결 실패");
+                    const errData = await response.json();
+                    // 에러 메시지를 화면에 직접 뿌려서 원인 파악
+                    throw new Error(errData.error.message || "Unknown API Error");
                 }
 
                 const data = await response.json();
                 const text = data.candidates[0].content.parts[0].text;
-                
-                // JSON 데이터만 정밀 추출
-                const startIdx = text.indexOf('[');
-                const endIdx = text.lastIndexOf(']') + 1;
-                if (startIdx === -1) throw new Error("데이터 추출 실패");
-                
-                const jsonStr = text.substring(startIdx, endIdx);
+                const jsonStr = text.match(/\[.*\]/s)[0];
                 return JSON.parse(jsonStr);
             } catch (e) {
-                console.error("Error Detail:", e);
-                document.getElementById('loading').innerHTML = "❌ 시스템 오류 발생<br><small>" + e.message + "</small>";
+                console.error("Critical:", e);
+                document.getElementById('loading').innerHTML = `❌ 에러 발생: ${e.message}<br><br><b>해결책:</b> 구글 AI 스튜디오에서 API 활성화를 확인해주세요.`;
                 return null;
             }
         }
@@ -88,20 +77,13 @@
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
             const query = urlParams.get('q');
-            
             if (query) {
                 document.getElementById('user-info').innerText = `"${query}" 분석 결과`;
                 const results = await getAIResponse(query);
-                
-                if (results && Array.isArray(results)) {
+                if (results) {
                     let html = "";
                     results.forEach(item => {
-                        html += `<tr>
-                            <td><b>${item.name}</b></td>
-                            <td>${item.effect}</td>
-                            <td class="warning">${item.caution}</td>
-                            <td><a href="https://www.coupang.com/np/search?q=${item.name}" target="_blank" class="btn-link">조회</a></td>
-                        </tr>`;
+                        html += `<tr><td><b>${item.name}</b></td><td>${item.effect}</td><td class="warning">${item.caution}</td><td><a href="https://www.coupang.com/np/search?q=${item.name}" target="_blank" class="btn-link">조회</a></td></tr>`;
                     });
                     document.getElementById('result-table-body').innerHTML = html;
                     document.getElementById('loading').style.display = 'none';
