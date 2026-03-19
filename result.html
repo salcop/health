@@ -39,73 +39,73 @@
     </div>
 
     <script>
-        const API_KEY = "AIzaSyCktRjrGnIdA3iO4BE5bONjy_f_Dmg0a50"; 
+    const API_KEY = "AIzaSyCktRjrGnIdA3iO4BE5bONjy_f_Dmg0a50"; 
 
-        async function getAIResponse(query) {
-            // 가장 안정적인 v1beta 경로와 모델명 사용
-            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    async function getAIResponse(query) {
+        // v1 정식 경로 사용
+        const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        
+        // 프롬프트 강화: 잡다한 설명 없이 오직 JSON 배열만 출력하도록 강제
+        const prompt = `사용자의 건강 고민 "${query}"에 도움되는 영양소 성분 3개를 추천해줘. 
+        반드시 JSON 형식의 배열로만 답해줘. 다른 설명은 일절 금지.
+        형식: [{"name":"성분명","effect":"기능요약","caution":"주의사항"}]`;
+        
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        // 문제가 된 response_mime_type 삭제
+                        temperature: 0.2
+                    }
+                })
+            });
             
-            const prompt = `Task: Recommendation for "${query}". Output ONLY a raw JSON array. 
-            Format: [{"name":"성분명","effect":"기능","caution":"주의"}] 
-            Respond only with the array, no markdown.`;
+            const data = await response.json();
             
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.1 }
-                    })
+            if (data.error) throw new Error(data.error.message);
+
+            let text = data.candidates[0].content.parts[0].text;
+            
+            // AI가 간혹 마크다운(```json)을 붙이는 경우를 대비한 정규식 추출
+            const jsonMatch = text.match(/\[.*\]/s);
+            if (!jsonMatch) throw new Error("데이터 형식이 올바르지 않습니다.");
+            
+            return JSON.parse(jsonMatch[0]);
+        } catch (e) {
+            console.error("Critical Error:", e);
+            document.getElementById('loading').innerHTML = "❌ 분석 에러 발생: 다시 시도해 주세요.<br>(" + e.message + ")";
+            return null;
+        }
+    }
+
+    window.onload = async function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('q');
+        
+        if (query) {
+            document.getElementById('user-info').innerText = `"${query}" 분석 결과`;
+            const results = await getAIResponse(query);
+            
+            if (results && Array.isArray(results)) {
+                let html = "";
+                results.forEach(item => {
+                    html += `<tr>
+                        <td><b>${item.name}</b></td>
+                        <td>${item.effect}</td>
+                        <td class="warning">${item.caution}</td>
+                        <td><a href="[https://www.coupang.com/np/search?q=$](https://www.coupang.com/np/search?q=$){item.name}" target="_blank" class="btn-link">조회</a></td>
+                    </tr>`;
                 });
-                
-                const data = await response.json();
-                if (data.error) throw new Error(data.error.message);
-
-                let text = data.candidates[0].content.parts[0].text;
-                
-                // [정밀 추출 로직] 텍스트 중 JSON 배열 시작과 끝을 찾아 수동 파싱
-                const startIdx = text.indexOf('[');
-                const endIdx = text.lastIndexOf(']') + 1;
-                
-                if (startIdx === -1 || endIdx === 0) {
-                    throw new Error("AI가 데이터 형식을 맞추지 못했습니다.");
-                }
-                
-                const cleanJson = text.substring(startIdx, endIdx);
-                return JSON.parse(cleanJson);
-            } catch (e) {
-                console.error("Debug:", e);
-                document.getElementById('loading').innerHTML = "❌ 분석 지연 발생: 다시 검색해 주세요.<br>(" + e.message + ")";
-                return null;
+                document.getElementById('result-table-body').innerHTML = html;
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('result-table-ui').style.display = 'table';
+                document.getElementById('action-area-ui').style.display = 'flex';
             }
         }
-
-        window.onload = async function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const query = urlParams.get('q');
-            
-            if (query) {
-                document.getElementById('user-info').innerText = `"${query}" 분석 결과`;
-                const results = await getAIResponse(query);
-                
-                if (results && Array.isArray(results)) {
-                    let html = "";
-                    results.forEach(item => {
-                        html += `<tr>
-                            <td><b>${item.name}</b></td>
-                            <td>${item.effect}</td>
-                            <td class="warning">${item.caution}</td>
-                            <td><a href="https://www.coupang.com/np/search?q=${item.name}" target="_blank" class="btn-link">조회</a></td>
-                        </tr>`;
-                    });
-                    document.getElementById('result-table-body').innerHTML = html;
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('result-table-ui').style.display = 'table';
-                    document.getElementById('action-area-ui').style.display = 'flex';
-                }
-            }
-        };
-    </script>
+    };
+</script>
 </body>
 </html>
