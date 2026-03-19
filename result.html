@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>분석 결과 - SJ 건강 인덱스</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background: #f9f9f9; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        h2 { font-size: 18px; border-bottom: 2px solid #0056b3; padding-bottom: 10px; color: #0056b3; }
+        .info-txt { font-size: 14px; color: #666; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+        th, td { border: 1px solid #eee; padding: 12px 8px; text-align: left; }
+        th { background: #f4f7fa; font-weight: 600; }
+        .warning { color: #d93025; font-weight: bold; }
+        .btn-link { display: inline-block; padding: 6px 12px; background: #ff9900; color: #fff; text-decoration: none; border-radius: 4px; font-size: 12px; }
+        .action-area { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-action { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .btn-kakao { background: #fee500; color: #3c1e1e; }
+        .btn-home { background: #333; color: #fff; }
+        .disclaimer { font-size: 11px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>영양소 데이터 매칭 리포트</h2>
+        <div id="loading">데이터 분석 중...</div>
+        <div id="content" style="display:none;">
+            <p class="info-txt" id="user-info"></p>
+            <table>
+                <thead><tr><th>성분</th><th>기능</th><th>주의사항</th><th>최저가</th></tr></thead>
+                <tbody id="result-table">
+                    </tbody>
+            </table>
+            <div class="action-area">
+                <button class="btn-action btn-kakao" onclick="shareKakao()">카톡 공유</button>
+                <button class="btn-action btn-home" onclick="alert('브라우저 설정에서 [홈 화면에 추가]를 눌러주세요!')">앱처럼 사용하기</button>
+            </div>
+        </div>
+        <div class="disclaimer">
+            본 서비스는 식약처(KFDA) 공공 데이터를 기반으로 자동 매칭된 정보입니다. 
+            의학적 진단을 대신할 수 없으며, 복용 전 반드시 의사/약사와 상의하십시오.
+        </div>
+    </div>
+
+    <script>
+        // 실제로는 여기서 Azure Function API를 호출하여 데이터를 가져옵니다.
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const query = urlParams.get('q');
+            document.getElementById('user-info').innerText = `검색어: "${query}" 분석 결과`;
+            
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                // 예시 데이터 렌더링
+                const html = `
+                    <tr><td><b>MSM</b></td><td>관절/연골 건강</td><td class="warning">위장장애 주의</td><td><a href="#" class="btn-link">조회</a></td></tr>
+                    <tr><td><b>비타민D</b></td><td>뼈 형성 도움</td><td>고칼슘혈증 주의</td><td><a href="#" class="btn-link">조회</a></td></tr>
+                `;
+                document.getElementById('result-table').innerHTML = html;
+            }, 1000);
+        };
+        function shareKakao() { alert("카카오톡 SDK 연결 시 리포트가 전송됩니다."); }
+    </script>
+</body>
+</html>
