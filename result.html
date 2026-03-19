@@ -55,73 +55,60 @@
     </div>
 
     <script>
-        // 형님이 주신 Gemini API 키 탑재완료!
-        const API_KEY = "AIzaSyCktRjrGnIdA3iO4BE5bONjy_f_Dmg0a50"; 
+    const API_KEY = "AIzaSyCktRjrGnIdA3iO4BE5bONjy_f_Dmg0a50"; 
 
-        async function getAIResponse(query) {
-            // AI에게 보내는 프롬프트: JSON 형식으로만 답하게 강제함
-            const prompt = `사용자의 건강 고민: "${query}". 이 고민에 도움되는 영양소 성분 3개를 추천해줘. 반드시 다음 JSON 형식으로만 답해줘: [{"name":"성분명","effect":"기능 요약","caution":"주의사항"}]`;
+    async function getAIResponse(query) {
+        const prompt = `사용자의 건강 고민: "${query}". 이 고민에 도움되는 영양소 성분 3개를 추천해줘. 반드시 다음 JSON 형식으로만 답해줘 (설명 생략): [{"name":"성분명","effect":"기능 요약","caution":"주의사항"}]`;
+        
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
             
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { response_mime_type: "application/json" } // JSON 출력 강제 설정
-                    })
+            const data = await response.json();
+            let text = data.candidates[0].content.parts[0].text;
+            
+            // 핵심: 앞뒤 마크다운(```json) 및 불필요한 공백 완벽 제거
+            text = text.replace(/```json|```/g, "").trim();
+            
+            return JSON.parse(text);
+        } catch (e) {
+            console.error("데이터 파싱 에러:", e);
+            return null;
+        }
+    }
+
+    window.onload = async function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('q');
+        
+        if (query) {
+            document.getElementById('user-info').innerText = `검색어: "${query}" 분석 결과`;
+            const results = await getAIResponse(query);
+            
+            if (results && Array.isArray(results)) {
+                let html = "";
+                results.forEach(item => {
+                    html += `<tr>
+                        <td><b>${item.name}</b></td>
+                        <td>${item.effect}</td>
+                        <td class="warning">${item.caution}</td>
+                        <td><a href="https://www.coupang.com/np/search?q=${item.name}" target="_blank" class="btn-link">조회</a></td>
+                    </tr>`;
                 });
-                
-                const data = await response.json();
-                
-                // AI 응답 텍스트 추출 및 불필요한 마크다운 제거
-                const text = data.candidates[0].content.parts[0].text;
-                // AI가 가끔 ```json ``` 마크다운을 붙여서 응답하는 경우를 대비해 제거
-                const cleanText = text.replace(/```json|```/g, "").trim();
-                
-                return JSON.parse(cleanText);
-            } catch (e) {
-                console.error("AI 호출 중 오류 발생:", e);
-                return null;
+                document.getElementById('result-table-body').innerHTML = html;
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('result-table-ui').style.display = 'table';
+                document.getElementById('action-area-ui').style.display = 'flex';
+            } else {
+                document.getElementById('loading').innerHTML = "AI 답변 형식 오류입니다. 다시 시도해주세요.";
             }
         }
-
-        window.onload = async function() {
-            // URL 파라미터에서 검색어 가져오기
-            const urlParams = new URLSearchParams(window.location.search);
-            const query = urlParams.get('q');
-            
-            if (query) {
-                document.getElementById('user-info').innerText = `검색어: "${query}" 분석 결과`;
-                
-                // 진짜 AI에게 데이터 요청
-                const results = await getAIResponse(query);
-                
-                if (results && Array.isArray(results)) {
-                    let html = "";
-                    results.forEach(item => {
-                        html += `<tr>
-                            <td><b>${item.name}</b></td>
-                            <td>${item.effect}</td>
-                            <td class="warning">${item.caution}</td>
-                            <td><a href="https://www.coupang.com/np/search?q=${item.name}" target="_blank" class="btn-link">조회</a></td>
-                        </tr>`;
-                    });
-                    
-                    // 표 채우기
-                    document.getElementById('result-table-body').innerHTML = html;
-                    // 로딩 숨기기
-                    document.getElementById('loading').style.display = 'none';
-                    // 데이터 보여주기
-                    document.getElementById('result-table-ui').style.display = 'table';
-                    document.getElementById('action-area-ui').style.display = 'flex';
-                } else {
-                    document.getElementById('loading').innerText = "분석 중 오류가 발생했습니다. 키를 확인해주세요.";
-                }
-            } else {
-                document.getElementById('loading').innerText = "검색어가 없습니다.";
-            }
-        };
-    </script>
+    };
+</script>
 </body>
 </html>
